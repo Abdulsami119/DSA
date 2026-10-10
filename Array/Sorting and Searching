@@ -1,0 +1,613 @@
+#include <iostream>
+#include <cmath>      // needed for sqrt() in jump search
+using namespace std;
+
+/*
+    ================================================================
+     SORTING AND SEARCHING ON A STATIC ARRAY
+    ================================================================
+
+     SORTING (arrange elements in ascending order)
+       1. Bubble Sort      - swap neighbours again and again
+       2. Selection Sort   - pick the smallest, place it at the front
+       3. Insertion Sort   - insert each element into the sorted part
+       4. Shell Sort       - insertion sort with big gaps first
+       5. Merge Sort       - split in halves, sort, then merge
+       6. Quick Sort       - pick a pivot, smaller left, bigger right
+       7. Heap Sort        - build a max heap, remove the largest
+       8. Counting Sort    - count how many times each value appears
+                             (a "linear time" sort)
+
+     SEARCHING (find the position of a value)
+       1. Linear Search          - check one by one
+       2. Binary Search          - halve the range (loop version)
+       3. Binary Search          - same idea using recursion
+       4. Jump Search            - jump in blocks, then scan one block
+       5. Interpolation Search   - guess the position using the values
+
+     Quick speed guide (n = number of elements):
+       Bubble / Selection / Insertion : slow for big n   -> O(n^2)
+       Shell Sort                     : in between       -> about O(n^1.5)
+       Merge / Quick / Heap           : fast             -> O(n log n)
+       Counting Sort                  : very fast        -> O(n + range)
+       Linear Search                  : O(n)
+       Binary Search                  : O(log n)  (sorted array only)
+       Jump Search                    : O(sqrt n) (sorted array only)
+       Interpolation Search           : O(log log n) on evenly spread
+                                        data (sorted array only)
+*/
+
+const int SIZE = 8;          // number of elements in our static array
+const int MAX_VALUE = 100;   // largest value allowed (used by counting sort)
+
+
+// ================================================================
+//  HELPER FUNCTIONS
+// ================================================================
+
+// Prints all the elements of the array on one line
+void display(int arr[], int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        cout << arr[i] << " ";
+    }
+    cout << endl;
+}
+
+// Copies source[] into dest[].
+// We use this so every sorting algorithm starts with the same unsorted data.
+void copyArray(int source[], int dest[], int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        dest[i] = source[i];
+    }
+}
+
+// Swaps two values. The & means we work on the real variables,
+// not on copies, so the swap is visible outside the function.
+void swapValues(int &a, int &b)
+{
+    int temp = a;
+    a = b;
+    b = temp;
+}
+
+
+// ================================================================
+//  SORTING ALGORITHMS
+// ================================================================
+
+// ---------------- 1. BUBBLE SORT ----------------
+// Idea: compare two neighbours. If the left one is bigger, swap them.
+// After the first pass, the biggest value has "bubbled" to the last place.
+// After the second pass, the second biggest is in its place, and so on.
+//
+// Example pass on 5 3 8 1:
+//   (5,3) swap -> 3 5 8 1
+//   (5,8) ok   -> 3 5 8 1
+//   (8,1) swap -> 3 5 1 8     <- 8 is now at its final place
+void bubbleSort(int arr[], int n)
+{
+    for (int i = 0; i < n - 1; i++)            // number of passes
+    {
+        for (int j = 0; j < n - i - 1; j++)    // compare neighbours
+        {
+            // n - i - 1 because the last i elements are already sorted
+            if (arr[j] > arr[j + 1])
+            {
+                swapValues(arr[j], arr[j + 1]);
+            }
+        }
+    }
+}
+
+// ---------------- 2. SELECTION SORT ----------------
+// Idea: look through the unsorted part, find the SMALLEST value,
+// and swap it with the first element of the unsorted part.
+// The sorted part grows from the left, one element each round.
+void selectionSort(int arr[], int n)
+{
+    for (int i = 0; i < n - 1; i++)
+    {
+        int minIndex = i;                      // assume first unsorted is smallest
+
+        for (int j = i + 1; j < n; j++)        // check the rest of the array
+        {
+            if (arr[j] < arr[minIndex])
+            {
+                minIndex = j;                  // found a smaller one, remember it
+            }
+        }
+
+        // put the smallest value at position i
+        swapValues(arr[i], arr[minIndex]);
+    }
+}
+
+// ---------------- 3. INSERTION SORT ----------------
+// Idea: works like sorting playing cards in your hand.
+// The left part is always sorted. Take the next element (key) and
+// slide it left until it sits in the right place.
+void insertionSort(int arr[], int n)
+{
+    for (int i = 1; i < n; i++)
+    {
+        int key = arr[i];       // the card we want to place
+        int j = i - 1;          // start looking at the element before it
+
+        // shift bigger elements one step to the right to make space
+        while (j >= 0 && arr[j] > key)
+        {
+            arr[j + 1] = arr[j];
+            j--;
+        }
+
+        arr[j + 1] = key;       // drop the key into the gap
+    }
+}
+
+// ---------------- 4. SHELL SORT ----------------
+// Idea: insertion sort is slow when a small value is far from its place.
+// Shell sort first compares elements that are far apart (a "gap"),
+// then reduces the gap until it becomes 1 (normal insertion sort).
+// By then the array is almost sorted, so the last step is fast.
+void shellSort(int arr[], int n)
+{
+    for (int gap = n / 2; gap > 0; gap = gap / 2)    // 4, 2, 1 for n = 8
+    {
+        // insertion sort, but jumping by 'gap' instead of by 1
+        for (int i = gap; i < n; i++)
+        {
+            int temp = arr[i];
+            int j = i;
+
+            while (j >= gap && arr[j - gap] > temp)
+            {
+                arr[j] = arr[j - gap];
+                j = j - gap;
+            }
+
+            arr[j] = temp;
+        }
+    }
+}
+
+// ---------------- 5. MERGE SORT ----------------
+// Idea (divide and conquer):
+//   1. Split the array into two halves
+//   2. Sort each half (by calling mergeSort again - recursion)
+//   3. Merge the two sorted halves into one sorted array
+//
+// merge() joins two sorted parts: arr[left..mid] and arr[mid+1..right]
+void merge(int arr[], int left, int mid, int right)
+{
+    int temp[SIZE];          // temporary space to build the merged result
+    int i = left;            // pointer in the left half
+    int j = mid + 1;         // pointer in the right half
+    int k = left;            // pointer in temp[]
+
+    // take the smaller front element from either half
+    while (i <= mid && j <= right)
+    {
+        if (arr[i] <= arr[j])
+        {
+            temp[k] = arr[i];
+            i++;
+        }
+        else
+        {
+            temp[k] = arr[j];
+            j++;
+        }
+        k++;
+    }
+
+    // one half may still have elements left, copy them as they are
+    while (i <= mid)
+    {
+        temp[k] = arr[i];
+        i++;
+        k++;
+    }
+    while (j <= right)
+    {
+        temp[k] = arr[j];
+        j++;
+        k++;
+    }
+
+    // copy the merged result back into the original array
+    for (int x = left; x <= right; x++)
+    {
+        arr[x] = temp[x];
+    }
+}
+
+void mergeSort(int arr[], int left, int right)
+{
+    // if left >= right there is 0 or 1 element, which is already sorted
+    if (left < right)
+    {
+        int mid = (left + right) / 2;
+
+        mergeSort(arr, left, mid);         // sort left half
+        mergeSort(arr, mid + 1, right);    // sort right half
+        merge(arr, left, mid, right);      // join them
+    }
+}
+
+// ---------------- 6. QUICK SORT ----------------
+// Idea (divide and conquer):
+//   1. Choose a pivot (we use the last element)
+//   2. Partition: move smaller values to the left of the pivot
+//      and bigger values to the right. The pivot is now in its FINAL place.
+//   3. Repeat the same for the left part and the right part
+//
+// partition() does step 2 and returns the final index of the pivot
+int partition(int arr[], int low, int high)
+{
+    int pivot = arr[high];     // last element is the pivot
+    int i = low - 1;           // i marks the end of the "smaller than pivot" area
+
+    for (int j = low; j < high; j++)
+    {
+        if (arr[j] <= pivot)
+        {
+            i++;
+            swapValues(arr[i], arr[j]);   // move small value into the left area
+        }
+    }
+
+    // place the pivot right after the smaller values
+    swapValues(arr[i + 1], arr[high]);
+    return i + 1;
+}
+
+void quickSort(int arr[], int low, int high)
+{
+    if (low < high)
+    {
+        int p = partition(arr, low, high);   // pivot is now at index p
+
+        quickSort(arr, low, p - 1);          // sort the part before the pivot
+        quickSort(arr, p + 1, high);         // sort the part after the pivot
+    }
+}
+
+// ---------------- 7. HEAP SORT ----------------
+// Idea: a max heap is a tree stored in an array where every parent
+// is bigger than its children. So the biggest value is always arr[0].
+//   1. Build a max heap from the array
+//   2. Swap the biggest (arr[0]) with the last element of the heap
+//   3. Shrink the heap by one and fix it again. Repeat.
+//
+// In the array, for the element at index i:
+//   left child  = 2 * i + 1
+//   right child = 2 * i + 2
+//
+// heapify() pushes arr[i] down until the heap rule is true again
+void heapify(int arr[], int n, int i)
+{
+    int largest = i;
+    int left = 2 * i + 1;
+    int right = 2 * i + 2;
+
+    if (left < n && arr[left] > arr[largest])
+    {
+        largest = left;
+    }
+    if (right < n && arr[right] > arr[largest])
+    {
+        largest = right;
+    }
+
+    // if a child is bigger, swap and keep fixing downwards
+    if (largest != i)
+    {
+        swapValues(arr[i], arr[largest]);
+        heapify(arr, n, largest);
+    }
+}
+
+void heapSort(int arr[], int n)
+{
+    // Step 1: build the max heap (start from the last parent node)
+    for (int i = n / 2 - 1; i >= 0; i--)
+    {
+        heapify(arr, n, i);
+    }
+
+    // Step 2 and 3: move the biggest to the end, shrink the heap
+    for (int i = n - 1; i > 0; i--)
+    {
+        swapValues(arr[0], arr[i]);
+        heapify(arr, i, 0);       // heap size is now i
+    }
+}
+
+// ---------------- 8. COUNTING SORT ----------------
+// Idea: instead of comparing elements, COUNT them.
+// count[v] stores how many times the value v appears in the array.
+// Then we write the values back in order: 0 as many times as it appeared,
+// then 1, then 2, and so on.
+// Note: this only works for whole numbers from 0 to MAX_VALUE.
+void countingSort(int arr[], int n)
+{
+    int count[MAX_VALUE + 1];
+
+    // Step 1: start every counter at 0
+    for (int i = 0; i <= MAX_VALUE; i++)
+    {
+        count[i] = 0;
+    }
+
+    // Step 2: count each value, e.g. value 25 adds 1 to count[25]
+    for (int i = 0; i < n; i++)
+    {
+        count[arr[i]]++;
+    }
+
+    // Step 3: write the values back in sorted order
+    int index = 0;
+    for (int value = 0; value <= MAX_VALUE; value++)
+    {
+        while (count[value] > 0)
+        {
+            arr[index] = value;
+            index++;
+            count[value]--;
+        }
+    }
+}
+
+
+// ================================================================
+//  SEARCHING ALGORITHMS
+//  Each function returns the index of the key, or -1 if not found.
+// ================================================================
+
+// ---------------- 1. LINEAR SEARCH ----------------
+// Idea: start at the first element and check every element one by one.
+// Works on ANY array (sorted or unsorted), but is slow for big arrays.
+int linearSearch(int arr[], int n, int key)
+{
+    for (int i = 0; i < n; i++)
+    {
+        if (arr[i] == key)
+        {
+            return i;        // found it, stop immediately
+        }
+    }
+    return -1;               // checked everything, not found
+}
+
+// ---------------- 2. BINARY SEARCH (loop) ----------------
+// Idea: like finding a word in a dictionary. Open in the middle:
+//   - if the middle is the key, done
+//   - if the key is bigger, ignore the left half
+//   - if the key is smaller, ignore the right half
+// The array MUST be sorted.
+int binarySearch(int arr[], int n, int key)
+{
+    int low = 0;             // start of the range we are still searching
+    int high = n - 1;        // end of that range
+
+    while (low <= high)
+    {
+        int mid = (low + high) / 2;
+
+        if (arr[mid] == key)
+        {
+            return mid;
+        }
+        else if (arr[mid] < key)
+        {
+            low = mid + 1;   // key must be in the right half
+        }
+        else
+        {
+            high = mid - 1;  // key must be in the left half
+        }
+    }
+    return -1;
+}
+
+// ---------------- 3. BINARY SEARCH (recursive) ----------------
+// Same idea as above, but instead of a loop the function calls itself
+// on the smaller half. The array MUST be sorted.
+int binarySearchRecursive(int arr[], int low, int high, int key)
+{
+    if (low > high)
+    {
+        return -1;           // empty range, so the key is not here
+    }
+
+    int mid = (low + high) / 2;
+
+    if (arr[mid] == key)
+    {
+        return mid;
+    }
+    else if (arr[mid] < key)
+    {
+        return binarySearchRecursive(arr, mid + 1, high, key);
+    }
+    else
+    {
+        return binarySearchRecursive(arr, low, mid - 1, key);
+    }
+}
+
+// ---------------- 4. JUMP SEARCH ----------------
+// Idea: jump ahead in blocks of size sqrt(n). When the last element of a
+// block is >= key, the key can only be inside that block, so we scan
+// that one block with a linear search. The array MUST be sorted.
+int jumpSearch(int arr[], int n, int key)
+{
+    int jump = (int)sqrt((double)n);   // block size
+    int start = 0;                     // where the current block starts
+    int end = jump;                    // where the current block ends
+
+    // keep jumping while the last element of the block is still smaller than key
+    while (end < n && arr[end - 1] < key)
+    {
+        start = end;
+        end = end + jump;
+    }
+
+    if (end > n)
+    {
+        end = n;                       // do not go past the array
+    }
+
+    // linear search inside the block
+    for (int i = start; i < end; i++)
+    {
+        if (arr[i] == key)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// ---------------- 5. INTERPOLATION SEARCH ----------------
+// Idea: binary search always checks the middle. Interpolation search
+// makes a smarter guess. Looking for 80 in 10..100? It checks near the
+// end, not the middle (like opening a dictionary near the back for "Z").
+// Best when values are spread evenly. The array MUST be sorted.
+int interpolationSearch(int arr[], int n, int key)
+{
+    int low = 0;
+    int high = n - 1;
+
+    // the key can only exist if it lies between arr[low] and arr[high]
+    while (low <= high && key >= arr[low] && key <= arr[high])
+    {
+        // all values in range are equal, avoid dividing by zero
+        if (arr[high] == arr[low])
+        {
+            if (arr[low] == key)
+            {
+                return low;
+            }
+            return -1;
+        }
+
+        // estimate the position using the key's value
+        int pos = low + ((key - arr[low]) * (high - low)) / (arr[high] - arr[low]);
+
+        if (arr[pos] == key)
+        {
+            return pos;
+        }
+        else if (arr[pos] < key)
+        {
+            low = pos + 1;
+        }
+        else
+        {
+            high = pos - 1;
+        }
+    }
+    return -1;
+}
+
+// Prints the result of a search in a readable way
+void showResult(const char name[], int key, int pos)
+{
+    cout << name << ": ";
+    if (pos != -1)
+    {
+        cout << key << " found at index " << pos << endl;
+    }
+    else
+    {
+        cout << key << " not found" << endl;
+    }
+}
+
+
+// ================================================================
+//  MAIN
+// ================================================================
+int main()
+{
+    int original[SIZE] = {64, 25, 12, 22, 11, 90, 35, 47};   // never changed
+    int arr[SIZE];                                           // working copy
+
+    cout << "Original array : ";
+    display(original, SIZE);
+    cout << endl;
+
+    // ---------- SORTING ----------
+    // Before each sort we copy the original back into arr,
+    // so every algorithm gets the same unsorted input.
+    cout << "---------- SORTING ----------" << endl;
+
+    copyArray(original, arr, SIZE);
+    bubbleSort(arr, SIZE);
+    cout << "Bubble Sort    : ";
+    display(arr, SIZE);
+
+    copyArray(original, arr, SIZE);
+    selectionSort(arr, SIZE);
+    cout << "Selection Sort : ";
+    display(arr, SIZE);
+
+    copyArray(original, arr, SIZE);
+    insertionSort(arr, SIZE);
+    cout << "Insertion Sort : ";
+    display(arr, SIZE);
+
+    copyArray(original, arr, SIZE);
+    shellSort(arr, SIZE);
+    cout << "Shell Sort     : ";
+    display(arr, SIZE);
+
+    copyArray(original, arr, SIZE);
+    mergeSort(arr, 0, SIZE - 1);
+    cout << "Merge Sort     : ";
+    display(arr, SIZE);
+
+    copyArray(original, arr, SIZE);
+    quickSort(arr, 0, SIZE - 1);
+    cout << "Quick Sort     : ";
+    display(arr, SIZE);
+
+    copyArray(original, arr, SIZE);
+    heapSort(arr, SIZE);
+    cout << "Heap Sort      : ";
+    display(arr, SIZE);
+
+    copyArray(original, arr, SIZE);
+    countingSort(arr, SIZE);
+    cout << "Counting Sort  : ";
+    display(arr, SIZE);
+
+    // arr is now sorted (counting sort was the last one),
+    // so we can use it for the searches that need a sorted array.
+
+    // ---------- SEARCHING ----------
+    cout << endl << "---------- SEARCHING ----------" << endl;
+
+    int key;
+    cout << "Enter a number to search: ";
+    cin >> key;
+    cout << endl;
+
+    // Linear search does not need sorting, so we use the original array
+    showResult("Linear Search (unsorted)     ", key, linearSearch(original, SIZE, key));
+
+    // The rest need the sorted array
+    showResult("Binary Search (loop)         ", key, binarySearch(arr, SIZE, key));
+    showResult("Binary Search (recursive)    ", key, binarySearchRecursive(arr, 0, SIZE - 1, key));
+    showResult("Jump Search                  ", key, jumpSearch(arr, SIZE, key));
+    showResult("Interpolation Search         ", key, interpolationSearch(arr, SIZE, key));
+
+    cout << endl << "Note: indexes for the sorted searches refer to the sorted array." << endl;
+
+    return 0;
+}
