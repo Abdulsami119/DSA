@@ -1,111 +1,131 @@
-
-#include <iostream>
-#include <queue>
+#include<iostream>
+#include<queue>
+#include<stack>
 using namespace std;
 
-// Node of the binary tree
 class Node {
 public:
-    int data;
-    Node* left;
-    Node* right;
 
-    // Constructor initializes the node
-    Node(int value) {
-        data = value;
-        left = nullptr;
-        right = nullptr;
-    }
+	int data;
+	Node* left;
+	Node* right;
+
+	Node() {
+		data = 0;
+		left = nullptr;
+		right = nullptr;
+	}
+	Node(int value) {
+		data = value;
+		left = nullptr;
+		right = nullptr;
+	}
+
 };
 
-// Function to create the binary tree
-Node* buildTree() {
-    int value;
 
-    cout << "Enter data (-1 for no node): ";
-    cin >> value;
+class BinaryTree {
+public:
 
-    // -1 means there is no node
-    if (value == -1) {
-        return nullptr;
-    }
+	Node* root;
 
-    // Create a new node
-    Node* newNode = new Node(value);
+	BinaryTree() {
+		root = nullptr;
+	}
 
-    // Create the left subtree
-    cout << "Enter left child of " << value << endl;
-    newNode->left = buildTree();
+	Node* BuildTree() {
+		int value;
+		cout << "Enter value (-1 for no node): ";
+		cin >> value;
+		if (value == -1) {
+			return nullptr;
+		}
+		Node* newNode = new Node(value);
+		cout << "Enter left child of " << value << endl;
+		newNode->left = BuildTree();
+		cout << "Enter right child of " << value << endl;
+		newNode->right = BuildTree();
+		return newNode;
+	}
 
-    // Create the right subtree
-    cout << "Enter right child of " << value << endl;
-    newNode->right = buildTree();
+	void PreOrder(Node* node) { //root, left, right
+		if (node == nullptr) {
+			return;
+		}
+		cout << node->data << " ";
+		PreOrder(node->left);
+		PreOrder(node->right);
+	}
+	void InOrder(Node* node) { //left, root, right
+		if (node == nullptr) {
+			return;
+		}
+		InOrder(node->left);
+		cout << node->data << " ";
+		InOrder(node->right);
+	}
+	void PostOrder(Node* node) { //left, right, root
+		if (node == nullptr) {
+			return;
+		}
+		PostOrder(node->left);
+		PostOrder(node->right);
+		cout << node->data << " ";
+	}
 
-    return newNode;
-}
+	void bfs(Node* root) {             //level order traversal
+		if (root == nullptr) return;
 
-// Breadth-First Search (BFS)
-// Visits nodes level by level using a queue
-void BFS(Node* root) {
-    if (root == nullptr) {
-        return;
-    }
+		queue<Node*> open;   //queue is used for bfs
+		open.push(root);
 
-    queue<Node*> q;
+		while (!open.empty()) {
+			Node* X = open.front();
+			open.pop();
+			cout << X->data << " "; //here we can also do some processing on the node, like searching for a value, etc.
 
-    // Insert the root into the queue
-    q.push(root);
+			if (X->left)  open.push(X->left);
+			if (X->right) open.push(X->right);
+		}
+	}
+	void dfs(Node* root) {         //depth first traversal (similar to pre-order)
+		if (root == nullptr) return;
 
-    while (!q.empty()) {
-        // Get the first node from the queue
-        Node* current = q.front();
-        q.pop();
+		stack<Node*> open; //same as bfs but using stack instead of queue
+		open.push(root);
 
-        // Visit and print the current node
-        cout << current->data << " ";
+		while (!open.empty()) {
+			Node* X = open.top();
+			open.pop();
+			cout << X->data << " "; //here we can also do some processing on the node, like searching for a value, etc.
 
-        // Add left child to the queue
-        if (current->left != nullptr) {
-            q.push(current->left);
-        }
-
-        // Add right child to the queue
-        if (current->right != nullptr) {
-            q.push(current->right);
-        }
-    }
-}
-
-// Depth-First Search (DFS)
-// Explores the left branch deeply before the right branch
-void DFS(Node* root) {
-    // Base case: stop if the node does not exist
-    if (root == nullptr) {
-        return;
-    }
-
-    // Visit the current node first
-    cout << root->data << " ";
-
-    // Explore the left subtree
-    DFS(root->left);
-
-    // Explore the right subtree
-    DFS(root->right);
-}
+			if (X->right) open.push(X->right);
+			if (X->left)  open.push(X->left);
+		}
+	}
+};
 
 int main() {
-    cout << "Build your Binary Tree" << endl;
+	BinaryTree tree;
 
-    Node* root = buildTree();
+	cout << "Build your Binary Tree" << endl;
+	tree.root = tree.BuildTree();
 
-    cout << "\nBreadth-First Search (BFS): ";
-    BFS(root);
+	cout << "\nPreOrder:  ";
+	tree.PreOrder(tree.root);
 
-    cout << "\nDepth-First Search (DFS): ";
-    DFS(root);
+	cout << "\nInOrder:   ";
+	tree.InOrder(tree.root);
 
-    cout << endl;
+	cout << "\nPostOrder: ";
+	tree.PostOrder(tree.root);
 
-    return 0;
+	cout << "\nBFS:       ";
+	tree.bfs(tree.root);
+
+	cout << "\nDFS:       ";
+	tree.dfs(tree.root);
+
+	cout << endl;
+	return 0;
 }
